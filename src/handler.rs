@@ -1152,6 +1152,10 @@ fn handle_shared_normal_action(app: &mut App, action: Action) {
                 app.should_quit = true;
             }
         }
+        Action::ExitMode => {
+            app.show_file_list = false;
+            app.focused_panel = FocusedPanel::Diff;
+        }
         Action::HalfPageDown => app.scroll_down(app.diff_state.viewport_height / 2),
         Action::HalfPageUp => app.scroll_up(app.diff_state.viewport_height / 2),
         Action::PageDown => app.scroll_down(app.diff_state.viewport_height),
@@ -1174,6 +1178,9 @@ fn handle_shared_normal_action(app: &mut App, action: Action) {
                 (FocusedPanel::Diff, false, _) => FocusedPanel::FileList,
                 (FocusedPanel::CommitSelector, _, _) => FocusedPanel::FileList,
             };
+            if app.focused_panel == FocusedPanel::FileList {
+                app.show_file_list = true;
+            }
         }
         Action::ToggleFocusReverse => {
             let has_selector = app.has_inline_commit_selector();
@@ -1186,6 +1193,9 @@ fn handle_shared_normal_action(app: &mut App, action: Action) {
                 (FocusedPanel::Diff, _, false) => FocusedPanel::FileList,
                 (FocusedPanel::CommitSelector, _, _) => FocusedPanel::Diff,
             };
+            if app.focused_panel == FocusedPanel::FileList {
+                app.show_file_list = true;
+            }
         }
         Action::ExpandAll => {
             app.expand_all_dirs();
