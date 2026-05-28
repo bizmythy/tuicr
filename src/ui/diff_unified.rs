@@ -1332,6 +1332,7 @@ mod remote_comments_snapshot_tests {
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Buffer;
+    use ratatui::layout::Rect;
     use std::path::{Path, PathBuf};
 
     struct SnapshotVcs {
@@ -1419,6 +1420,21 @@ mod remote_comments_snapshot_tests {
         }
     }
 
+    fn header_only_diff_file_at(path: &str) -> DiffFile {
+        let hunks = Vec::new();
+        let content_hash = DiffFile::compute_content_hash(&hunks);
+        DiffFile {
+            old_path: Some(PathBuf::from(path)),
+            new_path: Some(PathBuf::from(path)),
+            status: FileStatus::Modified,
+            hunks,
+            is_binary: false,
+            is_too_large: false,
+            is_commit_message: false,
+            content_hash,
+        }
+    }
+
     fn thread(
         id: &str,
         author: &str,
@@ -1489,12 +1505,53 @@ mod remote_comments_snapshot_tests {
         .expect("build app")
     }
 
+    fn make_revision_app(diff_files: Vec<DiffFile>) -> App {
+        let vcs_info = VcsInfo {
+            root_path: PathBuf::from("/tmp/tuicr"),
+            head_commit: "headsha".to_string(),
+            branch_name: None,
+            vcs_type: VcsType::Git,
+        };
+        let session = ReviewSession::new(
+            vcs_info.root_path.clone(),
+            "headsha".to_string(),
+            None,
+            SessionDiffSource::CommitRange,
+        );
+        App::build(
+            Box::new(SnapshotVcs {
+                info: vcs_info.clone(),
+            }),
+            vcs_info,
+            Theme::dark(),
+            None,
+            false,
+            diff_files,
+            session,
+            DiffSource::CommitRange(vec!["HEAD".to_string()]),
+            InputMode::Normal,
+            Vec::new(),
+            None,
+            None,
+        )
+        .expect("build app")
+    }
+
     fn draw(app: &mut App) -> Buffer {
         let backend = TestBackend::new(140, 30);
         let mut terminal = Terminal::new(backend).unwrap();
         terminal
             .draw(|frame| render(frame, app))
             .expect("draw frame");
+        terminal.backend().buffer().clone()
+    }
+
+    fn draw_unified_diff(app: &mut App) -> Buffer {
+        let backend = TestBackend::new(100, 12);
+        let mut terminal = Terminal::new(backend).unwrap();
+        terminal
+            .draw(|frame| super::render_unified_diff(frame, app, Rect::new(0, 0, 100, 12)))
+            .expect("draw unified diff");
         terminal.backend().buffer().clone()
     }
 
@@ -1527,6 +1584,23 @@ mod remote_comments_snapshot_tests {
         assert!(
             body.contains("looks good?"),
             "expected remote comment body in:\n{body}"
+        );
+    }
+
+    // Revision diffs with `wrap = true` render boxed file headers without a
+    // cursor gutter. The right-edge fill overlay must measure that exact row:
+    // treating it like guttered diff content truncated `README.md [M]` to
+    // `README` in `tuicr -r HEAD`.
+    #[test]
+    fn should_render_full_file_header_for_revision_diff() {
+        let mut app = make_revision_app(vec![header_only_diff_file_at("README.md")]);
+        app.diff_state.wrap_lines = true;
+
+        let body = body_text(&draw_unified_diff(&mut app));
+
+        assert!(
+            body.contains("║ README.md [M] "),
+            "expected full README.md file header in:\n{body}"
         );
     }
 

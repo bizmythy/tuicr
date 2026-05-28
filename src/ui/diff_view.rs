@@ -14,6 +14,7 @@ use crate::ui::comment_panel;
 use crate::ui::diff_side_by_side::render_side_by_side_diff;
 use crate::ui::diff_unified::render_unified_diff;
 use crate::ui::styles;
+use unicode_width::UnicodeWidthStr;
 
 /// Static header rule used for file/section headers; avoids `"═".repeat(40)` per frame.
 pub(super) const HEADER_RULE: &str = "════════════════════════════════════════";
@@ -839,7 +840,11 @@ pub(super) fn paint_file_header_fill(frame: &mut Frame, ctx: &DiffOverlayPaint) 
                 .or_else(|| line.spans.get(1))
                 .and_then(|s| s.style.fg)
                 .unwrap_or(ctx.theme.fg_primary);
-            let line_width = ctx.line_widths.get(idx).copied().unwrap_or(0);
+            let line_width = line
+                .spans
+                .iter()
+                .map(|span| span.content.width())
+                .sum::<usize>();
             let last_row = rows.saturating_sub(1);
             if visual_row + last_row >= ctx.inner.height as usize {
                 visual_row += rows;
