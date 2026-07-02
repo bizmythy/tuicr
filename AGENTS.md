@@ -315,6 +315,8 @@ These are non-obvious things the implementation chain hit. Worth preserving for 
 
 16. **GNU Linux release binaries must stay dynamically linked.** Static glibc binaries can crash when hostname lookup loads a host NSS module (for example Fedora's `libnss_myhostname`). The musl artifacts are the supported static Linux builds. Direct updates must preserve the running binary's GNU/musl target environment when selecting an asset.
 
+17. **GitHub refuses to render diffs past 300 files.** `gh pr diff` fails with HTTP 406 "diff exceeded the maximum number of files (300)", so the patch half of `get_pull_request_diff` caps out long before the metadata half does (`pull_request_file_metadata` paginates to 3000). It therefore tries local git first: when a matching local checkout contains both `baseRefOid` and `headRefOid`, it runs three-dot `git diff base...head` (GitHub renders PR diffs from the merge base, so three-dot — not two-dot — matches). When the fast path can't run and GitHub 406s, the error is annotated with the `git fetch origin <base> pull/<N>/head` hint. GitLab needs none of this: its `get_pull_request_diff` reads the paginated `/diffs` endpoint, which has no comparable cap.
+
 ### Keeping Docs Updated
 
 When adding user-facing features, update the relevant documentation:

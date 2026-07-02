@@ -104,6 +104,10 @@ its file or hunk is already marked reviewed, tuicr reveals the target without cl
 reviewed state.
 Auto-detects git, jj, or mercurial.
 
+Huge PRs work too: GitHub's diff API rejects PRs over 300 files (HTTP 406), so when you run
+`tuicr pr` inside a checkout of the repo, tuicr computes the diff with local git whenever both
+ends of the PR are present — fetch them first with `git fetch origin <base-branch> pull/<N>/head`.
+
 ## How it compares
 
 | | tuicr | [hunk](https://github.com/modem-dev/hunk) | [lumen](https://github.com/jnsahaj/lumen) | `gh pr review` | `git diff` |
