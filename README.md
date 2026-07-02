@@ -75,6 +75,10 @@ tuicr preselects commits newer than your latest submitted review when that metad
 commits already covered by that review are marked with `✓` in the inline selector.
 Auto-detects git, jj, or mercurial.
 
+Huge PRs work too: GitHub's diff API rejects PRs over 300 files (HTTP 406), so when you run
+`tuicr pr` inside a checkout of the repo, tuicr computes the diff with local git whenever both
+ends of the PR are present — fetch them first with `git fetch origin <base-branch> pull/<N>/head`.
+
 ## How it compares
 
 | | tuicr | [hunk](https://github.com/modem-dev/hunk) | [lumen](https://github.com/jnsahaj/lumen) | `gh pr review` | `git diff` |
