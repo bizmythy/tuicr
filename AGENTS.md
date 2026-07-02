@@ -240,6 +240,8 @@ These are non-obvious things the implementation chain hit. Worth preserving for 
 
 12. **`cd` into the worktree before running `cargo`.** `cargo` resolves `Cargo.toml` from `pwd`. Running gates from the wrong worktree silently exercises the wrong tree.
 
+13. **GitHub refuses to render diffs past 300 files.** `gh pr diff` (and the compare endpoint) fail with HTTP 406 "diff exceeded the maximum number of files (300)". `get_pull_request_diff` therefore tries local git first: when a matching local checkout contains both `baseRefOid` and `headRefOid`, it runs three-dot `git diff base...head` (GitHub renders PR diffs from the merge base, so three-dot — not two-dot — matches). GitLab mirrors this with two-dot, because `diff_refs.base_sha` already *is* the merge base. When the fast path can't run and GitHub 406s, the error is annotated with the `git fetch origin <base> pull/<N>/head` hint.
+
 ### Keeping Docs Updated
 
 When adding user-facing features, update the relevant documentation:

@@ -105,6 +105,9 @@ fn read_blob_with_repo(repo_root: &Path, sha: &str, path: &Path) -> Option<Strin
 /// Return `Some(diff)` when both SHAs exist locally, via `git diff <start>..<end>`.
 fn local_range_diff(repo_root: &Path, start_sha: &str, end_sha: &str) -> Option<String> {
     for sha in [start_sha, end_sha] {
+        if sha.is_empty() {
+            return None;
+        }
         let exists = run_command_output(
             "git",
             Some(repo_root),
@@ -396,6 +399,17 @@ where
     }
 
     fn get_pull_request_diff(&self, pr: &PullRequestDetails) -> Result<String> {
+        // Fast path: GitLab's `diff_refs.base_sha` is already the merge base
+        // of source and target, so a plain two-dot local diff reproduces the
+        // MR's cumulative diff when both SHAs exist in the checkout. Local
+        // git also sidesteps forge-side diff size limits. Empty/missing
+        // `base_sha` (no `diff_refs` in the MR payload) falls through.
+        if let Some(root) = self.local_checkout.as_deref()
+            && let Some(diff) = local_range_diff(root, &pr.base_sha, &pr.head_sha)
+        {
+            return Ok(diff);
+        }
+
         let args = vec![
             "mr".to_string(),
             "diff".to_string(),
