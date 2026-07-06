@@ -6959,7 +6959,7 @@ impl App {
         match self.comment_vim_pending {
             CommentVimPending::Save => return Some(("Enter again to save".to_string(), false)),
             CommentVimPending::Cancel => {
-                return Some(("Esc/q again to cancel".to_string(), true));
+                return Some(("Esc again to cancel".to_string(), true));
             }
             CommentVimPending::None => {}
         }
@@ -10916,6 +10916,22 @@ mod target_selector_tests {
         build_app_with_commits(Vec::new())
     }
 
+    fn vim_key(code: crossterm::event::KeyCode) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::NONE)
+    }
+
+    fn vim_alt_key(code: crossterm::event::KeyCode) -> crossterm::event::KeyEvent {
+        crossterm::event::KeyEvent::new(code, crossterm::event::KeyModifiers::ALT)
+    }
+
+    fn enter_comment_vim_normal(app: &mut App) {
+        app.comment_vim_enabled = true;
+        app.enter_review_comment_mode();
+        app.ensure_comment_vim_editor();
+        crate::handler::handle_comment_vim_key(app, vim_key(crossterm::event::KeyCode::Esc));
+        assert!(app.comment_vim_in_normal_mode());
+    }
+
     #[test]
     fn comment_vim_command_line_q_cancels_w_saves() {
         let mut app = build_app();
@@ -10981,11 +10997,152 @@ mod target_selector_tests {
         assert_eq!(app.comment_vim_pending, CommentVimPending::Cancel);
         assert_eq!(
             app.comment_vim_mode_label(),
-            Some(("Esc/q again to cancel".to_string(), true))
+            Some(("Esc again to cancel".to_string(), true))
         );
         app.comment_vim_esc_normal();
         assert_eq!(app.input_mode, InputMode::Normal);
         assert_eq!(app.comment_vim_pending, CommentVimPending::None);
+    }
+
+    #[test]
+    fn comment_vim_router_keeps_bare_q_for_editor_and_colon_q_cancels() {
+        let mut app = build_app();
+        enter_comment_vim_normal(&mut app);
+
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_key(crossterm::event::KeyCode::Char('q')),
+        );
+        assert_eq!(app.input_mode, InputMode::Comment);
+        assert_eq!(app.comment_vim_pending, CommentVimPending::None);
+
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_key(crossterm::event::KeyCode::Char(':')),
+        );
+        assert!(app.comment_vim_command_active());
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_key(crossterm::event::KeyCode::Char('q')),
+        );
+        crate::handler::handle_comment_vim_key(&mut app, vim_key(crossterm::event::KeyCode::Enter));
+        assert_eq!(app.input_mode, InputMode::Normal);
+    }
+
+    #[test]
+    fn comment_vim_router_alt_enter_saves_comment() {
+        let mut app = build_app();
+        app.comment_vim_enabled = true;
+        app.enter_review_comment_mode();
+        app.ensure_comment_vim_editor();
+        for c in "ship it".chars() {
+            crate::handler::handle_comment_vim_key(
+                &mut app,
+                vim_key(crossterm::event::KeyCode::Char(c)),
+            );
+        }
+
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_alt_key(crossterm::event::KeyCode::Enter),
+        );
+        assert_eq!(app.input_mode, InputMode::Normal);
+        assert_eq!(app.session.review_comments.len(), 1);
+        assert_eq!(app.session.review_comments[0].content, "ship it");
+    }
+
+    #[test]
+    fn comment_vim_router_alt_t_cycles_type_in_all_editor_modes() {
+        let mut app = build_app();
+        app.comment_vim_enabled = true;
+        app.enter_review_comment_mode();
+        app.ensure_comment_vim_editor();
+        assert_eq!(app.comment_type.id(), "note");
+
+        // Insert mode.
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_alt_key(crossterm::event::KeyCode::Char('t')),
+        );
+        assert_eq!(app.comment_type.id(), "suggestion");
+
+        // Normal mode.
+        crate::handler::handle_comment_vim_key(&mut app, vim_key(crossterm::event::KeyCode::Esc));
+        assert!(app.comment_vim_in_normal_mode());
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_alt_key(crossterm::event::KeyCode::Char('t')),
+        );
+        assert_eq!(app.comment_type.id(), "issue");
+
+        // Visual mode.
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_key(crossterm::event::KeyCode::Char('v')),
+        );
+        assert_eq!(
+            app.comment_vim_mode_label(),
+            Some(("VISUAL".to_string(), false))
+        );
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_alt_key(crossterm::event::KeyCode::Char('t')),
+        );
+        assert_eq!(app.comment_type.id(), "praise");
+
+        // Search mode, including reverse cycling.
+        crate::handler::handle_comment_vim_key(&mut app, vim_key(crossterm::event::KeyCode::Esc));
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_key(crossterm::event::KeyCode::Char('/')),
+        );
+        assert_eq!(
+            app.comment_vim_mode_label(),
+            Some(("SEARCH".to_string(), false))
+        );
+        crate::handler::handle_comment_vim_key(
+            &mut app,
+            vim_alt_key(crossterm::event::KeyCode::Char('T')),
+        );
+        assert_eq!(app.comment_type.id(), "issue");
+    }
+
+    #[test]
+    fn comment_vim_router_search_and_vim_commands_reach_edtui() {
+        let mut app = build_app();
+        enter_comment_vim_normal(&mut app);
+        app.comment_buffer = "alpha beta\nbeta gamma".to_string();
+        app.comment_cursor = 0;
+        app.comment_vim_editor = Some(crate::comment_vim::CommentVimEditor::from_buffer(
+            &app.comment_buffer,
+            app.comment_cursor,
+        ));
+        crate::handler::handle_comment_vim_key(&mut app, vim_key(crossterm::event::KeyCode::Esc));
+
+        for code in [
+            crossterm::event::KeyCode::Char('/'),
+            crossterm::event::KeyCode::Char('b'),
+            crossterm::event::KeyCode::Char('e'),
+            crossterm::event::KeyCode::Char('t'),
+            crossterm::event::KeyCode::Char('a'),
+            crossterm::event::KeyCode::Enter,
+        ] {
+            crate::handler::handle_comment_vim_key(&mut app, vim_key(code));
+        }
+        assert_eq!(app.comment_cursor, "alpha ".len());
+
+        for code in [
+            crossterm::event::KeyCode::Char('c'),
+            crossterm::event::KeyCode::Char('i'),
+            crossterm::event::KeyCode::Char('w'),
+        ] {
+            crate::handler::handle_comment_vim_key(&mut app, vim_key(code));
+        }
+        assert_eq!(app.comment_buffer, "alpha \nbeta gamma");
+        assert_eq!(
+            app.comment_vim_mode_label(),
+            Some(("INSERT".to_string(), false))
+        );
     }
 
     #[test]

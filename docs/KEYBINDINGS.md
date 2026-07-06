@@ -85,6 +85,7 @@ Shown below the file tree when local comments or visible remote PR threads exist
 | Key | Action |
 |-----|--------|
 | `Tab` / `Shift-Tab` | Cycle comment type forward / backward (per `comment_types` order) |
+| `Alt-t` / `Alt-T` | Cycle comment type forward / backward (app-level override; also works in all vim comment editor modes) |
 | `Enter` / `Ctrl-Enter` / `Ctrl-s` | Save comment |
 | `Shift-Enter` / `Ctrl-j` | Insert newline |
 | `←` / `→` | Move cursor |
@@ -95,13 +96,14 @@ Shown below the file tree when local comments or visible remote PR threads exist
 With `comment_vim = true` the box uses [`edtui`](https://github.com/preiter93/edtui)
 modal editing (Normal/Insert/Visual: `hjkl`, `w`/`b`/`e`, `dd`/`D`/`ciw`/`x`,
 `u`/`Ctrl-r`, visual `v`+`y`/`d`/`p`). From Normal mode `:w` (or `Enter` twice)
-saves and `:q` (or `Esc`/`q` twice) cancels — the first press arms the action
+saves and `:q` (or `Esc` twice) cancels — the first press arms the action
 and the header shows a confirm hint. `Alt-Enter` (Option+Enter) accepts and
 `Alt-Esc` discards directly (no double-press) — Alt is the one modified
 `Enter`/`Esc` that reaches the app across terminals, including browser/web
 terminals like zellij web. `Tab` cycles the comment type in Normal
-mode and inserts `comment_tab_width` spaces (default 4) in Insert mode; `Ctrl-s`
-also saves. Operator+motion combos like
+mode and inserts `comment_tab_width` spaces (default 4) in Insert mode; `Alt-t`
+and `Alt-T` cycle comment type from Insert/Normal/Visual/Search as an
+app-level override. `Ctrl-s` also saves. Operator+motion combos like
 `dw`/`cw` aren't supported (edtui limitation).
 
 ## Commands

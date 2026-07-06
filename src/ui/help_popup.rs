@@ -520,12 +520,16 @@ pub fn render_help(frame: &mut Frame, app: &mut App) {
             Span::raw("Cancel"),
         ]),
         Line::from(vec![
+            Span::styled("  Alt-t/T  ", Style::default().add_modifier(Modifier::BOLD)),
+            Span::raw("Cycle comment type"),
+        ]),
+        Line::from(vec![
             Span::styled(
                 "  comment_vim",
                 Style::default().add_modifier(Modifier::BOLD),
             ),
             Span::raw(if app.comment_vim_enabled {
-                "Vim ON (i/a:insert Esc:normal hjkl dd/ciw/x u; S-Enter:save S-Esc:discard :w/:q)"
+                "Vim ON (i/a:insert Esc:normal hjkl dd/ciw/x u; Alt-t:type Enter x2/:w save Esc x2/:q discard)"
             } else {
                 "Set comment_vim=true (or :vim) for vim modal editing"
             }),

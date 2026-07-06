@@ -1,4 +1,4 @@
-use crossterm::event::{MouseButton, MouseEvent, MouseEventKind};
+use crossterm::event::{KeyCode, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
 use ratatui::layout::Position;
 
 use crate::app::{
@@ -332,6 +332,91 @@ fn handle_left_click(app: &mut App, pos: Position) {
         app.move_cursor_to_annotation(idx);
         handle_diff_action(app, Action::SelectFile);
     }
+}
+
+/// Handle a comment-mode key while vim is active: app-level keys keep their
+/// semantics, everything else feeds the `edtui` overlay. Always returns `true`
+/// so the normal tuicr key map does not reinterpret editor keystrokes.
+pub fn handle_comment_vim_key(app: &mut App, key: KeyEvent) -> bool {
+    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
+
+    // An open `:` command-line captures all input until Enter/Esc.
+    if app.comment_vim_command_active() {
+        match key.code {
+            KeyCode::Enter => app.run_comment_vim_command(),
+            KeyCode::Esc => app.comment_vim_command_cancel(),
+            KeyCode::Backspace => app.comment_vim_command_backspace(),
+            KeyCode::Char(c) if !ctrl && !key.modifiers.contains(KeyModifiers::ALT) => {
+                app.comment_vim_command_push(c)
+            }
+            _ => {}
+        }
+        return true;
+    }
+
+    // Alt+Enter (Option+Enter) accepts (save) and Alt+Esc discards (cancel)
+    // directly, in any mode. Plain Enter remains owned by edtui in Insert and
+    // Search mode so normal editing/search behavior is preserved.
+    if key.modifiers.contains(KeyModifiers::ALT) {
+        match key.code {
+            KeyCode::Enter => {
+                app.save_comment();
+                return true;
+            }
+            KeyCode::Esc => {
+                app.exit_comment_mode();
+                return true;
+            }
+            KeyCode::Char('t') => {
+                app.cycle_comment_type();
+                return true;
+            }
+            KeyCode::Char('T') => {
+                app.cycle_comment_type_reverse();
+                return true;
+            }
+            _ => {}
+        }
+    }
+
+    let normal = app.comment_vim_in_normal_mode();
+
+    // In Normal mode a first plain Enter/Esc arms a confirm (header shows the
+    // hint); a second consecutive press saves (`:w`) / cancels (`:q`). Do not
+    // steal `q`: quitting the comment box is `:q`, and bare normal-mode keys
+    // should be left to the Vim engine as much as possible.
+    if normal && key.modifiers.is_empty() {
+        match key.code {
+            KeyCode::Enter => {
+                app.comment_vim_enter_normal();
+                return true;
+            }
+            KeyCode::Esc => {
+                app.comment_vim_esc_normal();
+                return true;
+            }
+            _ => {}
+        }
+    }
+    // Any other key breaks a pending double-press sequence.
+    app.comment_vim_reset_pending();
+
+    match key.code {
+        // Save shortcut in any mode (Ctrl-C cancel is handled earlier).
+        KeyCode::Char('s') if ctrl => app.save_comment(),
+        KeyCode::Enter if ctrl => app.save_comment(),
+        // Tab cycles the comment type in Normal mode; in Insert it inserts a
+        // soft tab (`comment_tab_width` spaces). BackTab is not supported by
+        // edtui's key conversion, so keep it app-owned in all modes.
+        KeyCode::Tab | KeyCode::Char('\t') if normal => app.cycle_comment_type(),
+        KeyCode::Tab | KeyCode::Char('\t') => app.comment_vim_insert_soft_tab(),
+        KeyCode::BackTab => app.cycle_comment_type_reverse(),
+        // `:` opens the comment command-line in Normal mode (`:w` saves, `:q`
+        // cancels). Other modes receive `:` as normal editor/search input.
+        KeyCode::Char(':') if normal => app.start_comment_vim_command(),
+        _ => app.comment_vim_feed_key(key),
+    }
+    true
 }
 
 /// Export review: either to clipboard or set pending stdout output based on app.output_to_stdout.

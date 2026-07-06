@@ -152,8 +152,12 @@ pub fn format_comment_input_lines(
     // Top border with type label and hints. In vim mode the hints describe the
     // modal bindings and a `[MODE]` tag is shown after the type label.
     let hint = match vim_mode {
-        Some(_) => "(i:insert  Alt-Enter:save  Esc:normal  :w save  :q discard)".to_string(),
-        None => format!("(Tab/S-Tab:type Enter:save {newline_hint}:newline Esc:cancel)"),
+        Some(_) => {
+            "(i:insert  Alt-t:type  Alt-Enter:save  Esc:normal  :w save  :q discard)".to_string()
+        }
+        None => {
+            format!("(Tab/S-Tab:type Alt-t/T:type Enter:save {newline_hint}:newline Esc:cancel)")
+        }
     };
     let mut header_spans = vec![
         Span::styled(top_prefix, border_style),

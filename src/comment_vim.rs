@@ -5,7 +5,7 @@
 //! conversions bridge tuicr's UTF-8 byte offset and edtui's `Index2` (row +
 //! char-col), both UTF-8 aware.
 
-use crossterm::event::{Event, KeyEvent};
+use crossterm::event::{Event, KeyCode, KeyEvent};
 use edtui::{EditorEventHandler, EditorMode, EditorState, Index2, Lines};
 
 /// Active modal editor for the comment box. Present only while in comment mode
@@ -41,14 +41,16 @@ impl CommentVimEditor {
             EditorMode::Normal => "NORMAL",
             EditorMode::Insert => "INSERT",
             EditorMode::Visual => "VISUAL",
-            _ => "NORMAL",
+            EditorMode::Search => "SEARCH",
         }
     }
 
     /// Feed a key event to the editor and return the resulting
     /// `(text, byte_cursor)` for the caller to sync into the canonical buffer.
     pub fn feed_key(&mut self, key: KeyEvent) -> (String, usize) {
-        self.events.on_key_event(key, &mut self.state);
+        if is_edtui_key_supported(key.code) {
+            self.events.on_key_event(key, &mut self.state);
+        }
         self.text_and_cursor()
     }
 
@@ -64,6 +66,26 @@ impl CommentVimEditor {
         let cursor = index2_to_byte(&text, self.state.cursor);
         (text, cursor)
     }
+}
+
+fn is_edtui_key_supported(code: KeyCode) -> bool {
+    matches!(
+        code,
+        KeyCode::Backspace
+            | KeyCode::Enter
+            | KeyCode::Left
+            | KeyCode::Right
+            | KeyCode::Up
+            | KeyCode::Down
+            | KeyCode::Home
+            | KeyCode::End
+            | KeyCode::PageUp
+            | KeyCode::PageDown
+            | KeyCode::Tab
+            | KeyCode::Delete
+            | KeyCode::Esc
+            | KeyCode::Char(_)
+    )
 }
 
 /// Convert an edtui `(row, col)` index into a UTF-8 byte offset into `text`.
@@ -119,6 +141,10 @@ mod tests {
         KeyEvent::new(code, KeyModifiers::NONE)
     }
 
+    fn ctrl(c: char) -> KeyEvent {
+        KeyEvent::new(KeyCode::Char(c), KeyModifiers::CONTROL)
+    }
+
     #[test]
     fn insert_mode_typing_syncs_buffer() {
         let mut editor = CommentVimEditor::from_buffer("", 0);
@@ -155,6 +181,73 @@ mod tests {
         editor.feed_key(key('d'));
         let (text, _) = editor.feed_key(key('d'));
         assert_eq!(text, "line2");
+    }
+
+    #[test]
+    fn normal_mode_word_motion_and_undo_redo_work() {
+        let mut editor = CommentVimEditor::from_buffer("hello world", 0);
+        editor.feed_key(special(KeyCode::Esc));
+        let (_, cursor) = editor.feed_key(key('w'));
+        assert_eq!(cursor, 6);
+
+        let (text, _) = editor.feed_key(key('x'));
+        assert_eq!(text, "hello orld");
+        let (text, _) = editor.text_and_cursor();
+        assert_eq!(text, "hello orld");
+
+        let (text, _) = editor.feed_key(key('u'));
+        assert_eq!(text, "hello world");
+        let (text, _) = editor.feed_key(ctrl('r'));
+        assert_eq!(text, "hello orld");
+    }
+
+    #[test]
+    fn normal_mode_search_finds_matches_and_keeps_status_visible() {
+        let mut editor = CommentVimEditor::from_buffer("alpha beta\nbeta gamma", 0);
+        editor.feed_key(special(KeyCode::Esc));
+        editor.feed_key(key('/'));
+        assert_eq!(editor.label(), "SEARCH");
+        for c in "beta".chars() {
+            editor.feed_key(key(c));
+        }
+
+        let (_, cursor) = editor.feed_key(special(KeyCode::Enter));
+        assert_eq!(editor.label(), "NORMAL");
+        assert_eq!(cursor, "alpha ".len());
+
+        let (_, cursor) = editor.feed_key(key('n'));
+        assert_eq!(cursor, "alpha beta\n".len());
+    }
+
+    #[test]
+    fn visual_mode_delete_selection_uses_edtui_selection() {
+        let mut editor = CommentVimEditor::from_buffer("abcde", 0);
+        editor.feed_key(special(KeyCode::Esc));
+        editor.feed_key(key('v'));
+        assert_eq!(editor.label(), "VISUAL");
+        editor.feed_key(key('l'));
+        let (text, cursor) = editor.feed_key(key('d'));
+        assert_eq!(text, "cde");
+        assert_eq!(cursor, 0);
+        assert_eq!(editor.label(), "NORMAL");
+    }
+
+    #[test]
+    fn normal_mode_yank_line_and_paste_use_internal_clipboard() {
+        let mut editor = CommentVimEditor::from_buffer("one\ntwo", 0);
+        editor.feed_key(special(KeyCode::Esc));
+        editor.feed_key(key('y'));
+        editor.feed_key(key('y'));
+        let (text, _) = editor.feed_key(key('p'));
+        assert_eq!(text, "one\none\ntwo");
+    }
+
+    #[test]
+    fn unsupported_crossterm_keys_are_ignored_instead_of_panicking() {
+        let mut editor = CommentVimEditor::from_buffer("abc", 0);
+        let (text, cursor) = editor.feed_key(special(KeyCode::BackTab));
+        assert_eq!(text, "abc");
+        assert_eq!(cursor, 0);
     }
 
     fn roundtrip(text: &str, byte: usize) {

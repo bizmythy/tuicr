@@ -14,10 +14,10 @@ use tuicr::cli::parse_cli_args;
 use tuicr::editor::{EditorError, EditorTarget};
 use tuicr::handler::{
     handle_command_action, handle_comment_action, handle_comment_navigator_action,
-    handle_commit_select_action, handle_commit_selector_action, handle_confirm_action,
-    handle_diff_action, handle_file_list_action, handle_help_action, handle_mouse_event,
-    handle_search_action, handle_submit_action_picker_action, handle_submit_confirm_action,
-    handle_submit_resolver_action, handle_visual_action,
+    handle_comment_vim_key, handle_commit_select_action, handle_commit_selector_action,
+    handle_confirm_action, handle_diff_action, handle_file_list_action, handle_help_action,
+    handle_mouse_event, handle_search_action, handle_submit_action_picker_action,
+    handle_submit_confirm_action, handle_submit_resolver_action, handle_visual_action,
 };
 use tuicr::input::{Action, map_key_to_action, map_target_filter_mode};
 use tuicr::terminal_state::{TerminalFeatures, TerminalSession};
@@ -728,83 +728,6 @@ fn dispatch_action(app: &mut App, action: Action) {
             FocusedPanel::CommitSelector => handle_commit_selector_action(app, action),
         },
     }
-}
-
-/// Handle a comment-mode key while vim is active: app-level keys keep their
-/// semantics, everything else feeds the overlay. Always returns `true`.
-fn handle_comment_vim_key(app: &mut App, key: crossterm::event::KeyEvent) -> bool {
-    use crossterm::event::{KeyCode, KeyModifiers};
-    let ctrl = key.modifiers.contains(KeyModifiers::CONTROL);
-
-    // An open `:` command-line captures all input until Enter/Esc.
-    if app.comment_vim_command_active() {
-        match key.code {
-            KeyCode::Enter => app.run_comment_vim_command(),
-            KeyCode::Esc => app.comment_vim_command_cancel(),
-            KeyCode::Backspace => app.comment_vim_command_backspace(),
-            KeyCode::Char(c) if !ctrl && !key.modifiers.contains(KeyModifiers::ALT) => {
-                app.comment_vim_command_push(c)
-            }
-            _ => {}
-        }
-        return true;
-    }
-
-    // Alt+Enter (Option+Enter) accepts (save) and Alt+Esc discards (cancel)
-    // directly, in any mode — no double-press. Alt is the one modified Enter/Esc
-    // that reaches the app across terminals, including browser/web terminals
-    // like zellij web (where Shift/Cmd+Enter get stripped or grabbed). Plain
-    // Enter still inserts a newline in Insert mode, so Alt+Enter is free here.
-    if key.modifiers.contains(KeyModifiers::ALT) {
-        match key.code {
-            KeyCode::Enter => {
-                app.save_comment();
-                return true;
-            }
-            KeyCode::Esc => {
-                app.exit_comment_mode();
-                return true;
-            }
-            _ => {}
-        }
-    }
-
-    let normal = app.comment_vim_in_normal_mode();
-
-    // In Normal mode a first plain Enter/Esc arms a confirm (header shows the
-    // hint); a second consecutive press saves (`:w`) / cancels (`:q`).
-    if normal && key.modifiers.is_empty() {
-        match key.code {
-            KeyCode::Enter => {
-                app.comment_vim_enter_normal();
-                return true;
-            }
-            // `q` behaves exactly like Esc here (arm/confirm cancel).
-            KeyCode::Esc | KeyCode::Char('q') => {
-                app.comment_vim_esc_normal();
-                return true;
-            }
-            _ => {}
-        }
-    }
-    // Any other key breaks a pending double-press sequence.
-    app.comment_vim_reset_pending();
-
-    match key.code {
-        // Save shortcut in any mode (Ctrl-C cancel is handled earlier).
-        KeyCode::Char('s') if ctrl => app.save_comment(),
-        KeyCode::Enter if ctrl => app.save_comment(),
-        // Tab cycles the comment type in Normal mode; in Insert it inserts a
-        // soft tab (`comment_tab_width` spaces).
-        KeyCode::Tab | KeyCode::Char('\t') if normal => app.cycle_comment_type(),
-        KeyCode::Tab | KeyCode::Char('\t') => app.comment_vim_insert_soft_tab(),
-        KeyCode::BackTab if normal => app.cycle_comment_type_reverse(),
-        // `:` opens the command-line in Normal mode (`:w` saves, `:q` cancels).
-        // Esc/Enter in Normal fall through to edtui (Esc is a no-op there).
-        KeyCode::Char(':') if normal => app.start_comment_vim_command(),
-        _ => app.comment_vim_feed_key(key),
-    }
-    true
 }
 
 fn run_editor_from_tui<W: Write>(

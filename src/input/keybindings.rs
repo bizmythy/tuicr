@@ -279,6 +279,12 @@ fn map_comment_mode(key: KeyEvent) -> Action {
         // Char('\t') instead of KeyCode::Tab.
         (KeyCode::Tab, _) | (KeyCode::Char('\t'), _) => Action::CycleCommentType,
         (KeyCode::BackTab, _) => Action::CycleCommentTypeReverse,
+        // App-level override for comment type switching that remains available
+        // when Tab has editing semantics in vim comment mode.
+        (KeyCode::Char('t'), mods) if mods.contains(KeyModifiers::ALT) => Action::CycleCommentType,
+        (KeyCode::Char('T'), mods) if mods.contains(KeyModifiers::ALT) => {
+            Action::CycleCommentTypeReverse
+        }
         // Cursor movement
         (KeyCode::Char('a'), KeyModifiers::CONTROL) => Action::TextCursorLineStart,
         (KeyCode::Char('e'), KeyModifiers::CONTROL) => Action::TextCursorLineEnd,
@@ -565,6 +571,15 @@ mod tests {
     fn should_map_tab_to_cycle_comment_type_in_comment_mode() {
         let action = map_comment_mode(KeyEvent::new(KeyCode::Tab, KeyModifiers::NONE));
         assert_eq!(action, Action::CycleCommentType);
+    }
+
+    #[test]
+    fn should_map_alt_t_to_comment_type_cycle_override_in_comment_mode() {
+        let action = map_comment_mode(KeyEvent::new(KeyCode::Char('t'), KeyModifiers::ALT));
+        assert_eq!(action, Action::CycleCommentType);
+
+        let action = map_comment_mode(KeyEvent::new(KeyCode::Char('T'), KeyModifiers::ALT));
+        assert_eq!(action, Action::CycleCommentTypeReverse);
     }
 
     #[test]
