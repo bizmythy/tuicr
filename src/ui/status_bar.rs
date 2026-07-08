@@ -247,6 +247,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
             InputMode::Search => " SEARCH ".to_string(),
             InputMode::Comment => " COMMENT ".to_string(),
             InputMode::Help => " HELP ".to_string(),
+            InputMode::Details => " DETAILS ".to_string(),
             InputMode::Confirm => " CONFIRM ".to_string(),
             InputMode::CommitSelect => " SELECT ".to_string(),
             InputMode::VisualSelect => {
@@ -280,6 +281,7 @@ pub fn render_status_bar(frame: &mut Frame, app: &App, area: Rect) {
                 InputMode::Search => Cow::Borrowed("   \u{21b5} search \u{00b7} esc cancel"),
                 InputMode::Comment => Cow::Borrowed("   ctrl-s save \u{00b7} esc cancel"),
                 InputMode::Help => Cow::Borrowed("   q/?/esc close"),
+                InputMode::Details => Cow::Borrowed("   j/k scroll \u{00b7} q/esc close"),
                 InputMode::Confirm => Cow::Borrowed("   y yes \u{00b7} n no"),
                 InputMode::CommitSelect => Cow::Borrowed(
                     "   j/k navigate \u{00b7} space select \u{00b7} \u{21b5} confirm \u{00b7} esc back",
@@ -596,6 +598,8 @@ mod pr_header_snapshot_tests {
             head_ref_name: "reviews".to_string(),
             base_ref_name: "main".to_string(),
             state: if closed { "CLOSED" } else { "OPEN" }.to_string(),
+            author: Some("alice".to_string()),
+            body: String::new(),
             closed,
             merged,
         }

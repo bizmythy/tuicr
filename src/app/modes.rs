@@ -77,16 +77,26 @@ impl App {
         }
     }
 
+    pub fn open_pr_details(&mut self) -> bool {
+        if !matches!(self.diff_source, DiffSource::PullRequest(_)) {
+            self.set_error("PR details are only available while reviewing a pull request");
+            return false;
+        }
+        self.input_mode = InputMode::Details;
+        self.details_state.scroll_offset = 0;
+        true
+    }
+
+    pub fn close_pr_details(&mut self) {
+        self.input_mode = InputMode::Normal;
+    }
+
     pub fn help_scroll_down(&mut self, lines: usize) {
-        let max_offset = self
-            .help_state
-            .total_lines
-            .saturating_sub(self.help_state.viewport_height);
-        self.help_state.scroll_offset = (self.help_state.scroll_offset + lines).min(max_offset);
+        scroll_state_down(&mut self.help_state, lines);
     }
 
     pub fn help_scroll_up(&mut self, lines: usize) {
-        self.help_state.scroll_offset = self.help_state.scroll_offset.saturating_sub(lines);
+        scroll_state_up(&mut self.help_state, lines);
     }
 
     pub fn help_scroll_to_top(&mut self) {
@@ -94,11 +104,23 @@ impl App {
     }
 
     pub fn help_scroll_to_bottom(&mut self) {
-        let max_offset = self
-            .help_state
-            .total_lines
-            .saturating_sub(self.help_state.viewport_height);
-        self.help_state.scroll_offset = max_offset;
+        scroll_state_to_bottom(&mut self.help_state);
+    }
+
+    pub fn details_scroll_down(&mut self, lines: usize) {
+        scroll_state_down(&mut self.details_state, lines);
+    }
+
+    pub fn details_scroll_up(&mut self, lines: usize) {
+        scroll_state_up(&mut self.details_state, lines);
+    }
+
+    pub fn details_scroll_to_top(&mut self) {
+        self.details_state.scroll_offset = 0;
+    }
+
+    pub fn details_scroll_to_bottom(&mut self) {
+        scroll_state_to_bottom(&mut self.details_state);
     }
 
     pub fn enter_confirm_mode(&mut self, action: ConfirmAction) {

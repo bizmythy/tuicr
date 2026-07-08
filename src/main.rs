@@ -15,9 +15,9 @@ use tuicr::editor::{EditorError, EditorTarget};
 use tuicr::handler::{
     handle_command_action, handle_comment_action, handle_comment_navigator_action,
     handle_commit_select_action, handle_commit_selector_action, handle_confirm_action,
-    handle_diff_action, handle_file_list_action, handle_help_action, handle_mouse_event,
-    handle_search_action, handle_submit_action_picker_action, handle_submit_confirm_action,
-    handle_submit_resolver_action, handle_visual_action,
+    handle_details_action, handle_diff_action, handle_file_list_action, handle_help_action,
+    handle_mouse_event, handle_search_action, handle_submit_action_picker_action,
+    handle_submit_confirm_action, handle_submit_resolver_action, handle_visual_action,
 };
 use tuicr::input::{Action, map_key_to_action, map_target_filter_mode};
 use tuicr::terminal_state::{TerminalFeatures, TerminalSession};
@@ -712,6 +712,7 @@ fn main() -> anyhow::Result<()> {
 fn dispatch_action(app: &mut App, action: Action) {
     match app.input_mode {
         InputMode::Help => handle_help_action(app, action),
+        InputMode::Details => handle_details_action(app, action),
         InputMode::Command => handle_command_action(app, action),
         InputMode::Search => handle_search_action(app, action),
         InputMode::Comment => handle_comment_action(app, action),

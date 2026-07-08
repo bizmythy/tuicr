@@ -97,6 +97,8 @@ fn make_pr_app_with_single_modified_file(file_path: &str) -> App {
         head_ref_name: "feat".to_string(),
         base_ref_name: "main".to_string(),
         state: "OPEN".to_string(),
+        author: Some("alice".to_string()),
+        body: String::new(),
         closed: false,
         merged: false,
     };

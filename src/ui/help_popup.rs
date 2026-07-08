@@ -603,6 +603,13 @@ pub fn render_help(frame: &mut Frame, app: &mut App) {
         ]),
         Line::from(vec![
             Span::styled(
+                "  :details  ",
+                Style::default().add_modifier(Modifier::BOLD),
+            ),
+            Span::raw("Show PR/MR title, URL, author, branches, and rendered description"),
+        ]),
+        Line::from(vec![
+            Span::styled(
                 "  :stage    ",
                 Style::default().add_modifier(Modifier::BOLD),
             ),

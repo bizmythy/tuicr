@@ -34,6 +34,7 @@ const COMMAND_SPECS: &[CommandSpec] = &[
     ),
     CommandSpec::new(&["clearc"], CommandKind::Clear(ClearScope::CommentsOnly)),
     CommandSpec::new(&["help", "h"], CommandKind::Help),
+    CommandSpec::new(&["details"], CommandKind::Details),
     CommandSpec::new(&["version"], CommandKind::Version),
     CommandSpec::new(&["update"], CommandKind::Update),
     CommandSpec::new(&["set wrap"], CommandKind::SetWrap),
@@ -109,6 +110,7 @@ enum CommandKind {
     Export,
     Clear(ClearScope),
     Help,
+    Details,
     Version,
     Update,
     SetWrap,
@@ -153,6 +155,7 @@ pub fn handle_mouse_event(app: &mut App, event: MouseEvent) {
             let over_commit_list = app.commit_list_inner_area.is_some_and(|r| r.contains(pos));
             match app.input_mode {
                 InputMode::Help => handle_help_action(app, action),
+                InputMode::Details => handle_details_action(app, action),
                 InputMode::CommitSelect | InputMode::Normal if over_commit_list => {
                     wheel_commit_list(app, scroll_up);
                 }
@@ -491,6 +494,24 @@ pub fn handle_help_action(app: &mut App, action: Action) {
     }
 }
 
+/// Handle actions in PR details mode (scrolling only)
+pub fn handle_details_action(app: &mut App, action: Action) {
+    match action {
+        Action::CursorDown(n) => app.details_scroll_down(n),
+        Action::CursorUp(n) => app.details_scroll_up(n),
+        Action::HalfPageDown => app.details_scroll_down(app.details_state.viewport_height / 2),
+        Action::HalfPageUp => app.details_scroll_up(app.details_state.viewport_height / 2),
+        Action::PageDown => app.details_scroll_down(app.details_state.viewport_height),
+        Action::PageUp => app.details_scroll_up(app.details_state.viewport_height),
+        Action::GoToTop => app.details_scroll_to_top(),
+        Action::GoToBottom => app.details_scroll_to_bottom(),
+        Action::MouseScrollDown(n) => app.details_scroll_down(n),
+        Action::MouseScrollUp(n) => app.details_scroll_up(n),
+        Action::ExitMode => app.close_pr_details(),
+        Action::Quit => app.should_quit = true,
+        _ => {}
+    }
+}
 /// Handle actions in Command mode (text input for :commands)
 pub fn handle_command_action(app: &mut App, action: Action) {
     match action {
@@ -761,6 +782,19 @@ fn dispatch_command(app: &mut App, kind: CommandKind) -> CommandAfterDispatch {
             app.exit_command_mode();
             app.toggle_help();
             CommandAfterDispatch::KeepMode
+        }
+        CommandKind::Details => {
+            if matches!(app.diff_source, crate::app::DiffSource::PullRequest(_)) {
+                // Leave command mode by hand before opening Details: the
+                // dispatch loop's ExitCommandMode path resets `input_mode` to
+                // Normal, which would clobber the popup mode.
+                app.exit_command_mode();
+                app.open_pr_details();
+                CommandAfterDispatch::KeepMode
+            } else {
+                app.open_pr_details();
+                CommandAfterDispatch::ExitCommandMode
+            }
         }
         CommandKind::Version => {
             app.set_message(format!("tuicr v{}", env!("CARGO_PKG_VERSION")));

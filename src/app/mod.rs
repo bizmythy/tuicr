@@ -541,6 +541,7 @@ pub enum InputMode {
     Command,
     Search,
     Help,
+    Details,
     Confirm,
     CommitSelect,
     VisualSelect,
@@ -621,6 +622,8 @@ pub struct PullRequestDiffSource {
     pub head_ref_name: String,
     pub base_ref_name: String,
     pub state: String,
+    pub author: Option<String>,
+    pub body: String,
     pub closed: bool,
     pub merged: bool,
 }
@@ -635,6 +638,8 @@ impl PullRequestDiffSource {
             head_ref_name: details.head_ref_name.clone(),
             base_ref_name: details.base_ref_name.clone(),
             state: details.state.clone(),
+            author: details.author.clone(),
+            body: details.body.clone(),
             closed: details.closed,
             merged: details.merged_at.is_some(),
         }
@@ -1005,6 +1010,7 @@ pub struct App {
     pub comment_navigator_state: CommentNavigatorState,
     pub diff_state: DiffState,
     pub help_state: HelpState,
+    pub details_state: HelpState,
     pub command_buffer: String,
     pub(crate) command_completion: Option<CommandCompletionState>,
     pub search_buffer: String,
@@ -1414,6 +1420,19 @@ pub struct HelpState {
     pub scroll_offset: usize,
     pub viewport_height: usize,
     pub total_lines: usize, // Set during render
+}
+
+fn scroll_state_down(state: &mut HelpState, lines: usize) {
+    let max_offset = state.total_lines.saturating_sub(state.viewport_height);
+    state.scroll_offset = (state.scroll_offset + lines).min(max_offset);
+}
+
+fn scroll_state_up(state: &mut HelpState, lines: usize) {
+    state.scroll_offset = state.scroll_offset.saturating_sub(lines);
+}
+
+fn scroll_state_to_bottom(state: &mut HelpState) {
+    state.scroll_offset = state.total_lines.saturating_sub(state.viewport_height);
 }
 
 /// Represents a comment location for deletion

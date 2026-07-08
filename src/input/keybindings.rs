@@ -143,6 +143,7 @@ pub fn map_key_to_action(key: KeyEvent, mode: InputMode, leader_key: char) -> Ac
         InputMode::Search => map_search_mode(key),
         InputMode::Comment => map_comment_mode(key),
         InputMode::Help => map_help_mode(key),
+        InputMode::Details => map_details_mode(key),
         InputMode::Confirm => map_confirm_mode(key),
         InputMode::CommitSelect => map_commit_select_mode(key),
         InputMode::VisualSelect => map_visual_mode(key),
@@ -331,6 +332,25 @@ fn map_help_mode(key: KeyEvent) -> Action {
         | (KeyCode::Char('q'), KeyModifiers::NONE)
         | (KeyCode::Char('?'), _) => Action::ToggleHelp,
         // Scroll navigation
+        (KeyCode::Char('j') | KeyCode::Down, KeyModifiers::NONE) => Action::CursorDown(1),
+        (KeyCode::Char('k') | KeyCode::Up, KeyModifiers::NONE) => Action::CursorUp(1),
+        (KeyCode::Char('d'), KeyModifiers::CONTROL) => Action::HalfPageDown,
+        (KeyCode::Char('u'), KeyModifiers::CONTROL) => Action::HalfPageUp,
+        (KeyCode::Char('f'), KeyModifiers::CONTROL) => Action::PageDown,
+        (KeyCode::Char('b'), KeyModifiers::CONTROL) => Action::PageUp,
+        (KeyCode::PageDown, KeyModifiers::NONE) => Action::PageDown,
+        (KeyCode::PageUp, KeyModifiers::NONE) => Action::PageUp,
+        (KeyCode::Char('g'), KeyModifiers::NONE) => Action::GoToTop,
+        (KeyCode::Char('G'), _) => Action::GoToBottom,
+        _ => Action::None,
+    }
+}
+
+fn map_details_mode(key: KeyEvent) -> Action {
+    match (key.code, key.modifiers) {
+        (KeyCode::Esc, KeyModifiers::NONE) | (KeyCode::Char('q'), KeyModifiers::NONE) => {
+            Action::ExitMode
+        }
         (KeyCode::Char('j') | KeyCode::Down, KeyModifiers::NONE) => Action::CursorDown(1),
         (KeyCode::Char('k') | KeyCode::Up, KeyModifiers::NONE) => Action::CursorUp(1),
         (KeyCode::Char('d'), KeyModifiers::CONTROL) => Action::HalfPageDown,

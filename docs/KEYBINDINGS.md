@@ -118,6 +118,7 @@ In command mode,
 | `:edit` | Open focused file in `$EDITOR` |
 | `:clip` (`:export`) | Copy review to clipboard |
 | `:diff` | Toggle diff view (unified / side-by-side) |
+| `:details` | In PR/MR mode, show title, URL, author, branches, and rendered description |
 | `:vim` / `:novim` (`:set vim` / `:set novim`) | Enable/toggle/disable vim modal editing in the comment box (overrides `comment_vim`) |
 | `:commits` | Select commits to review |
 | `:submit` | Open submit picker (Comment / Approve / Request changes / Draft) |
@@ -184,7 +185,7 @@ Mouse support is on by default. Disable with `mouse = false` in config.
 
 | Action | Effect |
 |--------|--------|
-| Wheel up / down | Scroll the panel under the cursor (file list, comment navigator, diff, commit list, or help popup) without moving the cursor line |
+| Wheel up / down | Scroll the panel under the cursor (file list, comment navigator, diff, commit list, help popup, or PR details popup) without moving the cursor line |
 | Click on a file | Jump to that file (lazygit-style) |
 | Click on a directory | Expand or collapse it |
 | Click on a diff line | Position the cursor on that line |

@@ -554,6 +554,13 @@ impl App {
                 self.set_message("Reloaded PR at new head".to_string());
             }
         } else {
+            // Same head: re-parse the diff to pick up any side-channel
+            // changes (rare), but keep the session intact. Also refresh
+            // display metadata so `:details` reflects edited descriptions.
+            self.diff_source = DiffSource::PullRequest(Box::new(
+                PullRequestDiffSource::from_details(&opened.details),
+            ));
+            self.current_pr_head = Some(opened.details.head_sha.clone());
             self.set_pr_last_reviewed_commit_from_metadata(
                 &opened.commits,
                 &opened.review_metadata,
@@ -635,7 +642,12 @@ impl App {
             self.spawn_pr_threads_fetch(&details_for_threads, local_checkout.clone());
         } else {
             // Same head: re-parse the diff to pick up any side-channel
-            // changes (rare), but keep the session intact.
+            // changes (rare), but keep the session intact. Also refresh
+            // display metadata so `:details` reflects edited descriptions.
+            self.diff_source = DiffSource::PullRequest(Box::new(
+                PullRequestDiffSource::from_details(&opened.details),
+            ));
+            self.current_pr_head = Some(opened.details.head_sha.clone());
             self.set_pr_last_reviewed_commit_from_metadata(
                 &opened.commits,
                 &opened.review_metadata,

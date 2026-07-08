@@ -10,7 +10,7 @@ use crate::ui::diff_view::render_diff_view;
 use crate::ui::file_list::render_file_list;
 use crate::ui::inline_commit_selector::render_inline_commit_selector;
 use crate::ui::selector::render_commit_select;
-use crate::ui::{comment_panel, help_popup, status_bar, styles, submit_modals};
+use crate::ui::{comment_panel, help_popup, pr_details_popup, status_bar, styles, submit_modals};
 
 const FILE_LIST_MIN_HEIGHT: u16 = 4;
 const COMMENT_NAVIGATOR_MIN_HEIGHT: u16 = 4;
@@ -45,9 +45,12 @@ pub fn render(frame: &mut Frame, app: &mut App) {
     status_bar::render_status_bar(frame, app, chunks[2]);
     status_bar::render_command_completion_popup(frame, app, chunks[2]);
 
-    // Render help popup on top if in help mode
+    // Render help/details popups on top if active.
     if app.input_mode == InputMode::Help {
         help_popup::render_help(frame, app);
+    }
+    if app.input_mode == InputMode::Details {
+        pr_details_popup::render_pr_details(frame, app);
     }
 
     // Comment input is now rendered inline in the diff view

@@ -2098,6 +2098,37 @@ fn should_treat_commits_as_alias_for_local_target_selector() {
 }
 
 #[test]
+fn should_open_pr_details_from_details_command_in_pr_mode() {
+    // given
+    let mut app = build_app();
+    app.input_mode = InputMode::Command;
+    app.diff_source = DiffSource::PullRequest(Box::new(PullRequestDiffSource::from_details(
+        &test_pr_details(42, "details"),
+    )));
+    app.command_buffer = "details".to_string();
+    // when
+    crate::handler::handle_command_action(&mut app, crate::input::Action::SubmitInput);
+    // then
+    assert_eq!(app.input_mode, InputMode::Details);
+    assert!(app.command_buffer.is_empty());
+}
+
+#[test]
+fn should_reject_details_command_outside_pr_mode() {
+    // given
+    let mut app = build_app();
+    app.input_mode = InputMode::Command;
+    app.command_buffer = "details".to_string();
+    // when
+    crate::handler::handle_command_action(&mut app, crate::input::Action::SubmitInput);
+    // then
+    assert_eq!(app.input_mode, InputMode::Normal);
+    assert_eq!(
+        app.message.as_ref().map(|m| m.message_type.clone()),
+        Some(MessageType::Error)
+    );
+}
+#[test]
 fn should_complete_command_when_only_one_candidate_matches() {
     // given
     let mut app = build_app();
