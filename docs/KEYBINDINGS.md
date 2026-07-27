@@ -197,6 +197,7 @@ In command mode,
 | `:copy-url` | Copy the open PR URL to clipboard (PR mode) |
 | `:summary` | Show all pending local-draft comments; `j`/`k` select and `Enter` jumps |
 | `:diff` | Toggle diff view (unified / side-by-side) |
+| `:branch` | Copy the review's branch name to clipboard (PR/MR head branch, else local branch) |
 | `:vim` / `:novim` (`:set vim` / `:set novim`) | Enable/toggle/disable vim modal editing in the comment box (overrides `comment_vim`) |
 | `:commits` | Select commits to review |
 | `:sessions` (`:reviews`) | Resume a saved review for this checkout |
