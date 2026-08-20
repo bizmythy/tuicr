@@ -57,11 +57,14 @@ impl App {
     /// - Comments are added/removed
     /// - Diff view mode changes
     pub fn rebuild_annotations(&mut self) {
+        self.diff_file_stats = self.diff_files.iter().map(DiffFile::stat).collect();
         if self.file_line_count_cache.is_empty() {
             self.populate_file_line_count_cache();
         }
 
         self.line_annotations.clear();
+        self.review_comment_anchor = 0;
+        self.file_comment_anchors = vec![0; self.diff_files.len()];
 
         // Pre-index remote threads by (path, line, side) for quick lookup
         // during the file/hunk walk. Threads whose visibility is
@@ -130,6 +133,10 @@ impl App {
             }
         }
 
+        // A new review-level draft is inserted after all existing review
+        // summaries/comments and before issue comments or file content.
+        self.review_comment_anchor = self.line_annotations.len();
+
         if let Some(info) = &self.pr_info
             && !info.issue_comments.is_empty()
         {
@@ -197,6 +204,10 @@ impl App {
                     }
                 }
             }
+
+            // New file comments render after the existing file-comment blocks
+            // and before the first hunk/binary row.
+            self.file_comment_anchors[file_idx] = self.line_annotations.len();
 
             if file.is_binary || file.hunks.is_empty() {
                 self.line_annotations
@@ -389,6 +400,7 @@ impl App {
             self.line_annotations.push(AnnotatedLine::Spacing);
         }
 
+        self.refresh_comment_navigator_items();
         self.refresh_search_matches();
     }
 

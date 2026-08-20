@@ -100,6 +100,7 @@ src/
 └── ui/
     ├── mod.rs
     ├── app_layout.rs    # Main render function, file list, diff view with inline comments
+    ├── diff_viewport.rs # Viewport-indexed unified/SBS rendering over line_annotations
     ├── pr_info_panel.rs # PR description panel (status, reviewers, checks, body)
     ├── comment_navigator.rs # Sidebar comment index for jumping local/remote comments
     ├── status_bar.rs    # Header, status bar, command line rendering
@@ -202,8 +203,8 @@ Repository-managed agent integrations:
 
 ### Important Implementation Details
 
-- **Infinite scroll**: All files rendered into one `Vec<Line>`, then sliced by `scroll_offset`
-- **Inline comments**: Comments are rendered in `app_layout.rs` after file headers and after relevant diff lines
+- **Viewport rendering**: `line_annotations` is the persistent document index; `diff_viewport.rs` resolves only the rows intersecting the terminal viewport. Styled diff spans, markdown comment boxes, and side-by-side row metadata must never be rebuilt for off-screen rows. Aggregate diff stats and comment-navigator items are refreshed with the annotation index rather than scanned per frame.
+- **Inline comments**: Active editors are represented as a virtual insertion/replacement over `line_annotations` using a stable annotation anchor, so typing changes only the visible editor rows without rebuilding the diff document.
 - **Comment navigator**: Built from `line_annotations` in rendered order. Local review/file/line comments and visible remote threads appear as compact rows; selecting one calls `move_cursor_to_annotation()` so the diff viewport scrolls to the comment.
 - **Session loading**: `App::new()` calls manifest-backed persistence helpers to restore previous review
 - **Collaborative session writes**: session JSON saves use a storage lock plus temp-file rename, with stale sidecar lock recovery if a process crashes while holding the lock. The TUI keeps a persisted-session snapshot so polling, `:e`, and autosave can merge external `tuicr review add` comments without overwriting local edits.

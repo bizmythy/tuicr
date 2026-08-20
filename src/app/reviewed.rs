@@ -426,12 +426,16 @@ impl App {
         let mut additions = 0;
         let mut deletions = 0;
         let mut files = 0;
-        for file in &self.diff_files {
+        for (idx, file) in self.diff_files.iter().enumerate() {
             if !self.file_passes_filter(file) {
                 continue;
             }
             files += 1;
-            let (a, d) = file.stat();
+            let (a, d) = self
+                .diff_file_stats
+                .get(idx)
+                .copied()
+                .unwrap_or_else(|| file.stat());
             additions += a;
             deletions += d;
         }

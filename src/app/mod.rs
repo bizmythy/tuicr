@@ -1112,6 +1112,9 @@ pub struct App {
     vcs_open_options: VcsOpenOptions,
     pub(crate) ephemeral_session_paths: HashSet<PathBuf>,
     pub diff_files: Vec<DiffFile>,
+    /// Per-file `(additions, deletions)`, refreshed with the annotation index
+    /// so frame rendering never rescans every diff line for the title.
+    pub(crate) diff_file_stats: Vec<(usize, usize)>,
     pub diff_source: DiffSource,
     pub pending_editor_target: Option<EditorTarget>,
     /// Windowed editors that have not exited yet; polled by
@@ -1125,6 +1128,7 @@ pub struct App {
 
     pub file_list_state: FileListState,
     pub comment_navigator_state: CommentNavigatorState,
+    comment_navigator_items_cache: Vec<CommentNavigatorItem>,
     pub diff_state: DiffState,
     pub help_state: HelpState,
     pub summary_state: SummaryState,
@@ -1365,6 +1369,14 @@ pub struct App {
     /// `annotations_replaced` is how many annotation entries exist for the comment being
     /// edited (0 for a new comment). Used by `is_line_highlighted` to adjust annotation lookups.
     pub comment_input_annotation_offset: Option<(usize, usize, usize)>,
+    /// Stable insertion point for the active inline comment editor, expressed
+    /// in the annotation document as `(start, annotations_replaced)`. Unlike
+    /// `comment_input_annotation_offset`, this does not change as the editor
+    /// grows and lets the renderer map viewport rows without walking the diff.
+    pub comment_input_annotation_anchor: Option<(usize, usize)>,
+    /// O(1) document insertion points rebuilt with `line_annotations`.
+    pub(crate) review_comment_anchor: usize,
+    pub(crate) file_comment_anchors: Vec<usize>,
     /// Information about available updates (set by background check)
     pub update_info: Option<UpdateInfo>,
     /// Accumulated digit count for {N}G jump-to-line

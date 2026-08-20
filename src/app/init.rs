@@ -460,6 +460,7 @@ impl App {
             .filter(|path| path.exists())
             .and_then(|path| SessionFileState::from_path(path).ok());
         let persisted_session_snapshot = session.clone();
+        let diff_file_stats = diff_files.iter().map(DiffFile::stat).collect();
 
         let mut app = Self {
             theme,
@@ -480,6 +481,7 @@ impl App {
             vcs_open_options: VcsOpenOptions::default(),
             ephemeral_session_paths: HashSet::new(),
             diff_files,
+            diff_file_stats,
             diff_source,
             pending_editor_target: None,
             editor_launches: Vec::new(),
@@ -489,6 +491,7 @@ impl App {
             relative_line_numbers: false,
             file_list_state: FileListState::default(),
             comment_navigator_state: CommentNavigatorState::default(),
+            comment_navigator_items_cache: Vec::new(),
             diff_state: DiffState::default(),
             help_state: HelpState::default(),
             summary_state: SummaryState::default(),
@@ -592,6 +595,9 @@ impl App {
             pending_stdout_output: None,
             comment_cursor_screen_pos: None,
             comment_input_annotation_offset: None,
+            comment_input_annotation_anchor: None,
+            review_comment_anchor: 0,
+            file_comment_anchors: Vec::new(),
             update_info: None,
             pending_count: None,
             review_commits: Vec::new(),

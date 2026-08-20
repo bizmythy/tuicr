@@ -190,7 +190,7 @@ impl App {
         }
     }
 
-    pub fn build_comment_navigator_items(&self) -> Vec<CommentNavigatorItem> {
+    fn compute_comment_navigator_items(&self) -> Vec<CommentNavigatorItem> {
         let mut items = Vec::new();
         let mut last_key: Option<CommentNavigatorKey> = None;
 
@@ -211,6 +211,14 @@ impl App {
         }
 
         items
+    }
+
+    pub(in crate::app) fn refresh_comment_navigator_items(&mut self) {
+        self.comment_navigator_items_cache = self.compute_comment_navigator_items();
+    }
+
+    pub fn build_comment_navigator_items(&self) -> Vec<CommentNavigatorItem> {
+        self.comment_navigator_items_cache.clone()
     }
 
     pub fn has_comment_navigator_items(&self) -> bool {
@@ -779,7 +787,7 @@ impl App {
 
     /// First annotation row of the comment rendered at `cursor_line` (or
     /// `cursor_line` itself when it isn't on a comment).
-    pub(in crate::app) fn comment_block_start(&self, cursor_line: usize) -> usize {
+    pub(crate) fn comment_block_start(&self, cursor_line: usize) -> usize {
         let Some(cur) = self.line_annotations.get(cursor_line) else {
             return cursor_line;
         };
@@ -793,6 +801,42 @@ impl App {
             start -= 1;
         }
         start
+    }
+
+    fn comment_block_len(&self, block_start: usize) -> usize {
+        let Some(first) = self.line_annotations.get(block_start) else {
+            return 0;
+        };
+        self.line_annotations[block_start..]
+            .iter()
+            .take_while(|annotation| Self::same_comment(annotation, first))
+            .count()
+    }
+
+    fn set_comment_input_anchor(&mut self, start: usize, replaced: usize) {
+        self.comment_input_annotation_anchor = Some((start, replaced));
+    }
+
+    fn new_line_comment_anchor(&self) -> usize {
+        let mut anchor = self.diff_state.cursor_line.saturating_add(1);
+        while matches!(
+            self.line_annotations.get(anchor),
+            Some(AnnotatedLine::LineComment { .. } | AnnotatedLine::RemoteThreadLine { .. })
+        ) {
+            anchor += 1;
+        }
+        anchor
+    }
+
+    fn new_file_comment_anchor(&self) -> usize {
+        self.file_comment_anchors
+            .get(self.diff_state.current_file_idx)
+            .copied()
+            .unwrap_or(self.line_annotations.len())
+    }
+
+    fn new_review_comment_anchor(&self) -> usize {
+        self.review_comment_anchor
     }
 
     /// Byte offset in the loaded `comment_buffer` for the start
@@ -850,6 +894,7 @@ impl App {
         // First annotation row of the comment under the cursor, so we can place
         // the text cursor on the line the diff cursor is actually pointing at.
         let block_start = self.comment_block_start(self.diff_state.cursor_line);
+        let block_len = self.comment_block_len(block_start);
 
         match location {
             Some(CommentLocation::Review { index }) => {
@@ -864,6 +909,7 @@ impl App {
                     self.comment_is_file_level = false;
                     self.comment_line = None;
                     self.editing_comment_id = Some(comment.id.clone());
+                    self.set_comment_input_anchor(block_start, block_len);
                     return true;
                 }
             }
@@ -881,6 +927,7 @@ impl App {
                     self.comment_is_file_level = true;
                     self.comment_line = None;
                     self.editing_comment_id = Some(comment.id.clone());
+                    self.set_comment_input_anchor(block_start, block_len);
                     return true;
                 }
             }
@@ -909,6 +956,7 @@ impl App {
                         self.comment_is_file_level = false;
                         self.comment_line = Some((line, side));
                         self.editing_comment_id = Some(comment.id.clone());
+                        self.set_comment_input_anchor(block_start, block_len);
                         return true;
                     }
                 }
@@ -920,6 +968,11 @@ impl App {
     }
 
     pub fn enter_comment_mode(&mut self, file_level: bool, line: Option<(u32, LineSide)>) {
+        let anchor = if file_level {
+            self.new_file_comment_anchor()
+        } else {
+            self.new_line_comment_anchor()
+        };
         self.input_mode = InputMode::Comment;
         // Snap horizontal scroll back to the left edge so the inline input
         // box renders inside the viewport on long lines.
@@ -930,9 +983,12 @@ impl App {
         self.comment_is_review_level = false;
         self.comment_is_file_level = file_level;
         self.comment_line = line;
+        self.editing_comment_id = None;
+        self.set_comment_input_anchor(anchor, 0);
     }
 
     pub fn enter_review_comment_mode(&mut self) {
+        let anchor = self.new_review_comment_anchor();
         self.input_mode = InputMode::Comment;
         self.diff_state.scroll_x = 0;
         self.comment_buffer.clear();
@@ -943,6 +999,7 @@ impl App {
         self.comment_line = None;
         self.comment_line_range = None;
         self.editing_comment_id = None;
+        self.set_comment_input_anchor(anchor, 0);
     }
 
     pub fn exit_comment_mode(&mut self) {
@@ -955,6 +1012,8 @@ impl App {
         self.comment_is_review_level = false;
         self.editing_comment_id = None;
         self.comment_line_range = None;
+        self.comment_input_annotation_anchor = None;
+        self.comment_input_annotation_offset = None;
     }
 
     pub fn save_comment(&mut self) {

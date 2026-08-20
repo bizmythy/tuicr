@@ -8,7 +8,7 @@ use ratatui::{
 use crate::app::{
     AnnotatedLine, App, DiffViewMode, ExpandDirection, GAP_EXPAND_BATCH, VisualSelection,
 };
-use crate::model::{Comment, DiffFile, DiffHunk, DiffLine, LineOrigin, LineSide};
+use crate::model::{DiffFile, DiffHunk, DiffLine, LineOrigin, LineSide};
 use crate::theme::Theme;
 use crate::ui::comment_panel;
 use crate::ui::diff_side_by_side::render_side_by_side_diff;
@@ -144,26 +144,6 @@ pub(super) fn expanded_context_lineno_field(dl: &DiffLine, lw: usize) -> String 
         .unwrap_or_else(|| " ".repeat(lw + 1))
 }
 
-/// Shared empty map so we can borrow `line_comments` without cloning per file per frame.
-pub(super) static EMPTY_LINE_COMMENTS: std::sync::LazyLock<
-    std::collections::HashMap<u32, Vec<Comment>>,
-> = std::sync::LazyLock::new(std::collections::HashMap::new);
-
-/// Compute the half-open `line_idx` range whose diff-line spans must be fully
-/// built this frame. Outside this range the hot loops push `Line::default()`
-/// placeholders so the bulk of per-line allocations are skipped.
-///
-/// In Comment mode the scroll offset may still be adjusted after building (to
-/// keep the inline input box visible), so fall back to building everything.
-pub(super) fn diff_visible_range(app: &App, inner: Rect) -> (usize, usize) {
-    if app.input_mode == crate::app::InputMode::Comment {
-        (0, usize::MAX)
-    } else {
-        let start = app.diff_state.scroll_offset;
-        (start, start.saturating_add(inner.height as usize))
-    }
-}
-
 pub(super) fn render_diff_view(frame: &mut Frame, app: &mut App, area: Rect) {
     match app.diff_view_mode {
         DiffViewMode::Unified => render_unified_diff(frame, app, area),
@@ -243,7 +223,10 @@ pub(super) fn diff_stat_title(app: &App) -> Line<'static> {
         let (_, a, d) = app.diff_stat();
         (a, d)
     } else {
-        app.diff_files[app.diff_state.current_file_idx].stat()
+        app.diff_file_stats
+            .get(app.diff_state.current_file_idx)
+            .copied()
+            .unwrap_or_else(|| app.diff_files[app.diff_state.current_file_idx].stat())
     };
 
     let theme = &app.theme;
@@ -290,42 +273,6 @@ pub(super) fn hunk_header_text_and_style(
             styles::diff_hunk_header_style(theme),
         )
     }
-}
-
-/// Render an expander line with direction arrow
-pub(super) fn render_expander_line(
-    lines: &mut Vec<Line<'_>>,
-    line_idx: &mut usize,
-    current_line_idx: usize,
-    direction: ExpandDirection,
-    remaining: usize,
-    theme: &Theme,
-) {
-    let indicator = cursor_indicator_spaced(*line_idx, current_line_idx);
-    lines.push(Line::from(vec![
-        Span::styled(indicator, styles::current_line_indicator_style(theme)),
-        Span::styled(
-            expander_body_text(direction, remaining),
-            styles::dim_style(theme),
-        ),
-    ]));
-    *line_idx += 1;
-}
-
-/// Render a "N lines hidden" informational line
-pub(super) fn render_hidden_lines(
-    lines: &mut Vec<Line<'_>>,
-    line_idx: &mut usize,
-    current_line_idx: usize,
-    count: usize,
-    theme: &Theme,
-) {
-    let indicator = cursor_indicator_spaced(*line_idx, current_line_idx);
-    lines.push(Line::from(vec![
-        Span::styled(indicator, styles::current_line_indicator_style(theme)),
-        Span::styled(hidden_lines_body_text(count), styles::dim_style(theme)),
-    ]));
-    *line_idx += 1;
 }
 
 pub(super) fn comment_type_presentation(

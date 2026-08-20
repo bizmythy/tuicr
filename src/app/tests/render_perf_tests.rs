@@ -185,10 +185,40 @@ fn frame_micros_with_comments(
 /// Median frame time in microseconds for a diff of `file_count` ×
 /// `lines_per_file`, drawn at a realistic terminal size.
 fn frame_micros(file_count: usize, lines_per_file: usize) -> u128 {
+    frame_micros_in_mode(file_count, lines_per_file, InputMode::Normal)
+}
+
+fn frame_micros_in_mode(file_count: usize, lines_per_file: usize, input_mode: InputMode) -> u128 {
+    frame_micros_in_view(
+        file_count,
+        lines_per_file,
+        input_mode,
+        DiffViewMode::Unified,
+    )
+}
+
+fn frame_micros_in_view(
+    file_count: usize,
+    lines_per_file: usize,
+    input_mode: InputMode,
+    view_mode: DiffViewMode,
+) -> u128 {
     let files = (0..file_count)
         .map(|i| file(&format!("src/module_{i}/file_{i}.rs"), lines_per_file))
         .collect();
     let mut app = app_with(files);
+    if view_mode == DiffViewMode::SideBySide {
+        app.toggle_diff_view_mode();
+    }
+    if input_mode == InputMode::Comment {
+        // File header, hunk header, then the first diff line.
+        app.diff_state.cursor_line = 2;
+        app.enter_comment_mode(false, Some((1, LineSide::New)));
+        app.comment_buffer.push('x');
+        app.comment_cursor = 1;
+    } else {
+        app.input_mode = input_mode;
+    }
     let mut terminal = Terminal::new(TestBackend::new(180, 50)).unwrap();
 
     let mut samples = Vec::new();
@@ -204,6 +234,32 @@ fn frame_micros(file_count: usize, lines_per_file: usize) -> u128 {
 }
 
 #[test]
+fn active_comment_editor_renders_at_a_deep_diff_anchor() {
+    let mut app = app_with(vec![file("src/large.rs", 200)]);
+    // File header + hunk header + zero-based source row 120.
+    app.diff_state.cursor_line = 122;
+    app.diff_state.scroll_offset = 110;
+    app.enter_comment_mode(false, Some((121, LineSide::New)));
+    app.comment_buffer = "viewport-local draft".to_string();
+    app.comment_cursor = app.comment_buffer.len();
+
+    let mut terminal = Terminal::new(TestBackend::new(120, 30)).unwrap();
+    terminal
+        .draw(|frame| crate::ui::render(frame, &mut app))
+        .expect("draw active editor");
+
+    let rendered: String = terminal
+        .backend()
+        .buffer()
+        .content
+        .iter()
+        .map(|cell| cell.symbol())
+        .collect();
+    assert!(rendered.contains("viewport-local draft"));
+    assert!(app.comment_cursor_screen_pos.is_some());
+}
+
+#[test]
 #[ignore = "timing measurement, run explicitly"]
 fn render_perf_scaling() {
     for (files, lines) in [(1, 200), (10, 200), (50, 200), (100, 200), (200, 200)] {
@@ -212,6 +268,23 @@ fn render_perf_scaling() {
             "{files:>4} files x {lines} lines = {:>7} diff lines: {:>8.2} ms/frame",
             files * lines,
             micros as f64 / 1000.0
+        );
+    }
+}
+
+#[test]
+#[ignore = "timing measurement, run explicitly"]
+fn render_perf_while_typing_comment() {
+    for lines in [200, 2_000, 10_000, 40_000, 200_000, 1_000_000] {
+        let normal = frame_micros_in_mode(1, lines, InputMode::Normal);
+        let comment = frame_micros_in_mode(1, lines, InputMode::Comment);
+        let side_by_side =
+            frame_micros_in_view(1, lines, InputMode::Comment, DiffViewMode::SideBySide);
+        println!(
+            "1 file x {lines:>7} lines: unified normal {:>7.2} ms, comment {:>7.2} ms; side-by-side comment {:>7.2} ms",
+            normal as f64 / 1000.0,
+            comment as f64 / 1000.0,
+            side_by_side as f64 / 1000.0,
         );
     }
 }

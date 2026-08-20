@@ -280,7 +280,7 @@ pub fn issue_comment_display_lines(
     2 + visual_lines
 }
 
-fn format_issue_comment_lines(
+pub(super) fn format_issue_comment_lines(
     theme: &Theme,
     comment: &PullRequestIssueComment,
     width: usize,
