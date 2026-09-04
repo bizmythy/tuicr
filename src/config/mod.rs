@@ -118,6 +118,14 @@ pub struct AppConfig {
     /// diff. Defaults to true; toggle at runtime with `H` (file tree) or
     /// `:set reviewed!`.
     pub show_reviewed: Option<bool>,
+    /// Whether files tagged `linguist-generated` / `gitlab-generated` in
+    /// `.gitattributes` appear in the file tree and the diff. Defaults to
+    /// false; toggle at runtime with `:set generated!`.
+    pub show_generated: Option<bool>,
+    /// Whether files tagged `linguist-vendored` in `.gitattributes` appear in
+    /// the file tree and the diff. Defaults to false; toggle at runtime with
+    /// `:set vendored!`.
+    pub show_vendored: Option<bool>,
     pub diff_view: Option<String>,
     /// Inline commit selector display order: `"descending"` (newest-first,
     /// the default) or `"ascending"` (oldest-first).
@@ -192,6 +200,8 @@ const KNOWN_KEYS: &[&str] = &[
     "show_pr_comments",
     "show_commits",
     "show_reviewed",
+    "show_generated",
+    "show_vendored",
     "diff_view",
     "commit_order",
     "initial_commit_selection",
@@ -417,6 +427,8 @@ fn load_config_from_path(path: &Path) -> Result<ConfigLoadOutcome> {
         show_pr_comments: read_bool(table, "show_pr_comments", &mut warnings),
         show_commits: read_bool(table, "show_commits", &mut warnings),
         show_reviewed: read_bool(table, "show_reviewed", &mut warnings),
+        show_generated: read_bool(table, "show_generated", &mut warnings),
+        show_vendored: read_bool(table, "show_vendored", &mut warnings),
         diff_view: read_enum(
             table,
             "diff_view",
@@ -1010,6 +1022,27 @@ mod tests {
         let outcome = parse_config("show_reviewed = \"no\"\n");
         assert_eq!(
             outcome.config.as_ref().and_then(|cfg| cfg.show_reviewed),
+            None
+        );
+        assert_eq!(outcome.warnings.len(), 1);
+    }
+
+    // show_generated / show_vendored
+
+    #[test]
+    fn should_parse_show_generated_and_show_vendored() {
+        let outcome = parse_config("show_generated = true\nshow_vendored = true\n");
+        let cfg = outcome.config.as_ref().expect("config");
+        assert_eq!(cfg.show_generated, Some(true));
+        assert_eq!(cfg.show_vendored, Some(true));
+        assert!(outcome.warnings.is_empty());
+    }
+
+    #[test]
+    fn should_warn_and_ignore_show_generated_with_invalid_type() {
+        let outcome = parse_config("show_generated = \"yes\"\n");
+        assert_eq!(
+            outcome.config.as_ref().and_then(|cfg| cfg.show_generated),
             None
         );
         assert_eq!(outcome.warnings.len(), 1);

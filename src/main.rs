@@ -325,6 +325,14 @@ fn main() -> anyhow::Result<()> {
         if cfg.show_reviewed == Some(false) {
             app.init_show_reviewed(false);
         }
+        // Files tagged generated/vendored in `.gitattributes` start hidden;
+        // these opt back in. `:set generated!` / `:set vendored!` toggle.
+        if cfg.show_generated == Some(true) {
+            app.init_show_generated(true);
+        }
+        if cfg.show_vendored == Some(true) {
+            app.init_show_vendored(true);
+        }
         // Pristine mode has no diff, so side-by-side would render two
         // identical panes. Honor the config for every other mode.
         if cfg.diff_view.as_deref() == Some("side-by-side") && !app.is_pristine_mode {
